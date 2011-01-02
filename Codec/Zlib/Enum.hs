@@ -2,7 +2,7 @@ module Codec.Zlib.Enum (
     -- * Enumeratees
     compress, decompress,
     -- * Re-exported from zlib-bindings 
-    WindowBits
+    WindowBits, defaultWindowBits
 ) where
 
 import Codec.Zlib
@@ -23,18 +23,6 @@ decompress config step0 = do
     inflate <- liftIO $ initInflate config
     checkDone (continue . goInflate inflate) step0
 
--- |
--- Compress (deflate) a stream of 'ByteString's. The 'WindowBits' also control
--- the format (zlib vs. gzip).
-
-compress :: MonadIO m
-    => Int        -- ^ Compression level
-    -> WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
-    -> Enumeratee ByteString ByteString m ()
-compress level config step0 = do
-    deflate <- liftIO $ initDeflate level config
-    checkDone (continue . goDeflate deflate) step0
-
 goInflate :: MonadIO m
     =>  Inflate
         --  ^ Zlib state
@@ -52,35 +40,17 @@ goInflate inflate k stream = case stream of
                            inflateOne   = withInflateInput inflate x (return . callback k)
                        in checkDone cont $$ joinIO inflateOne
 
--- A callback function for withInflateInput / withDeflateInput
-callback :: MonadIO m =>
-    (Stream a -> Iteratee a m b) -> IO (Maybe a) -> m (Step a m b)
+-- |
+-- Compress (deflate) a stream of 'ByteString's. The 'WindowBits' also control
+-- the format (zlib vs. gzip).
 
-callback k pop = maybe done more =<< liftIO pop
-  where
-    done   = return (Continue k)
-    more y = do step <- runIteratee (k (Chunks [y]))
-                case step of
-                     Continue k'    -> callback k' pop
-                     other          -> return other
-
--- testInflate = do
---     h <- openBinaryFile "test-out" WriteMode
---     run $ enumFile "test.z"
---            $$ enumInflate defaultWindowBits
---            $$ iterHandle h
---     hClose h
--- 
--- testDeflate = do
---     h <- openBinaryFile "test.z" WriteMode
---     run $ enumFile "test"
---            $$ enumDeflate 7 defaultWindowBits
---            $$ iterHandle h
---     hClose h
-
--- Conversion utility
-joinIO :: MonadIO m => IO (m (Step a m b)) -> Iteratee a m b
-joinIO = Iteratee . join . liftIO
+compress :: MonadIO m
+    => Int        -- ^ Compression level
+    -> WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
+    -> Enumeratee ByteString ByteString m ()
+compress level config step0 = do
+    deflate <- liftIO $ initDeflate level config
+    checkDone (continue . goDeflate deflate) step0
 
 goDeflate :: MonadIO m
     =>  Deflate
@@ -98,3 +68,33 @@ goDeflate deflate k stream = case stream of
     (Chunks (x:xs)) -> let cont k'      = goDeflate deflate k' (Chunks xs)
                            deflateOne   = withDeflateInput deflate x (return . callback k)
                        in checkDone cont $$ joinIO deflateOne
+
+-- A callback function for withInflateInput / withDeflateInput
+callback :: MonadIO m =>
+    (Stream a -> Iteratee a m b) -> IO (Maybe a) -> m (Step a m b)
+
+callback k pop = maybe done more =<< liftIO pop
+  where
+    done   = return (Continue k)
+    more y = do step <- runIteratee (k (Chunks [y]))
+                case step of
+                     Continue k'    -> callback k' pop
+                     other          -> return other
+
+-- Conversion utility
+joinIO :: MonadIO m => IO (m (Step a m b)) -> Iteratee a m b
+joinIO = Iteratee . join . liftIO
+
+-- testInflate = do
+--     h <- openBinaryFile "test-out" WriteMode
+--     run $ enumFile "test.z"
+--            $$ enumInflate defaultWindowBits
+--            $$ iterHandle h
+--     hClose h
+-- 
+-- testDeflate = do
+--     h <- openBinaryFile "test.z" WriteMode
+--     run $ enumFile "test"
+--            $$ enumDeflate 7 defaultWindowBits
+--            $$ iterHandle h
+--     hClose h
