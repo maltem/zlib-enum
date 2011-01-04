@@ -15,14 +15,14 @@ joinIO :: MonadIO m => IO (m (Step a m b)) -> Iteratee a m b
 joinIO = Iteratee . join . liftIO
 
 enumLoop :: Monad m =>
-     ((Stream b -> Iteratee b m c) -> Iteratee a m (Step b m c))
-     -> ((Stream b -> Iteratee b m c) -> a -> Iteratee b m c)
+     ((Stream b -> Iteratee b m c) -> Iteratee b m c)
+     -> (a -> (Stream b -> Iteratee b m c) -> Iteratee b m c)
      -> Enumeratee a b m c
 enumLoop done more = checkDone loop where
     loop k = do maybe_x <- E.head
                 case maybe_x of
-                     Nothing -> done k
-                     Just x  -> checkDone loop $$ more k x
+                     Nothing -> return $$ done k
+                     Just x  -> checkDone loop $$ more x k
 
 -- |
 -- Decompress (inflate) a stream of 'ByteString's. For example:
@@ -35,8 +35,8 @@ decompress :: MonadIO m
 decompress config step0 = do
     inflate <- liftIO $ initInflate config
     let done k      = do lastChunk <- liftIO $ finishInflate inflate
-                         return $$ k (Chunks [lastChunk])
-        more k x    = joinIO $ withInflateInput inflate x (return . callback k)
+                         k (Chunks [lastChunk])
+        more x k    = joinIO $ withInflateInput inflate x (return . callback k)
     enumLoop done more step0
 
 -- |
@@ -49,8 +49,8 @@ compress :: MonadIO m
     -> Enumeratee ByteString ByteString m ()
 compress level config step0 = do
     deflate <- liftIO $ initDeflate level config
-    let done k    = return $$ joinIO $ finishDeflate deflate (return . callback k)
-        more k x  = joinIO $ withDeflateInput deflate x (return . callback k)
+    let done k    = joinIO $ finishDeflate deflate (return . callback k)
+        more x k  = joinIO $ withDeflateInput deflate x (return . callback k)
     enumLoop done more step0
 
 -- A callback function for withInflateInput / withDeflateInput
