@@ -6,10 +6,23 @@ module Codec.Zlib.Enum (
 ) where
 
 import Codec.Zlib
-import Data.Enumerator
+import Data.Enumerator as E
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.ByteString (ByteString)
 import Control.Monad (join)
+
+joinIO :: MonadIO m => IO (m (Step a m b)) -> Iteratee a m b
+joinIO = Iteratee . join . liftIO
+
+enumLoop :: Monad m =>
+     ((Stream b -> Iteratee b m c) -> Iteratee a m (Step b m c))
+     -> ((Stream b -> Iteratee b m c) -> a -> Iteratee b m c)
+     -> Enumeratee a b m c
+enumLoop done more = checkDone loop where
+    loop k = do maybe_x <- E.head
+                case maybe_x of
+                     Nothing -> done k
+                     Just x  -> checkDone loop $$ more k x
 
 -- |
 -- Decompress (inflate) a stream of 'ByteString's. For example:
@@ -21,24 +34,10 @@ decompress :: MonadIO m
     -> Enumeratee ByteString ByteString m ()
 decompress config step0 = do
     inflate <- liftIO $ initInflate config
-    checkDone (continue . goInflate inflate) step0
-
-goInflate :: MonadIO m
-    =>  Inflate
-        --  ^ Zlib state
-    ->  (Stream ByteString -> Iteratee ByteString m b)
-        --  ^ Continuation to be called on the next chunk of decompressed data
-    ->  (Stream ByteString)
-        --  ^ Compressed data
-    ->  Iteratee ByteString m (Step ByteString m b)
-
-goInflate inflate k stream = case stream of
-    EOF             -> do lastChunk <- liftIO $ finishInflate inflate
-                          return $$ k (Chunks [lastChunk])
-    (Chunks [])     -> continue (goInflate inflate k)
-    (Chunks (x:xs)) -> let cont k'      = goInflate inflate k' (Chunks xs)
-                           inflateOne   = withInflateInput inflate x (return . callback k)
-                       in checkDone cont $$ joinIO inflateOne
+    let done k      = do lastChunk <- liftIO $ finishInflate inflate
+                         return $$ k (Chunks [lastChunk])
+        more k x    = joinIO $ withInflateInput inflate x (return . callback k)
+    enumLoop done more step0
 
 -- |
 -- Compress (deflate) a stream of 'ByteString's. The 'WindowBits' also control
@@ -50,24 +49,9 @@ compress :: MonadIO m
     -> Enumeratee ByteString ByteString m ()
 compress level config step0 = do
     deflate <- liftIO $ initDeflate level config
-    checkDone (continue . goDeflate deflate) step0
-
-goDeflate :: MonadIO m
-    =>  Deflate
-    --  ^ Zlib state
-    ->  (Stream ByteString -> Iteratee ByteString m b)
-    --  ^ Continuation to be called on the next chunk of compressed data
-    ->  (Stream ByteString)
-    --  ^ Uncompressed data
-    ->  Iteratee ByteString m (Step ByteString m b)
-
-goDeflate deflate k stream = case stream of
-    EOF             -> let callFinish = finishDeflate deflate (return . callback k)
-                       in return $$ joinIO callFinish
-    (Chunks [])     -> continue (goDeflate deflate k)
-    (Chunks (x:xs)) -> let cont k'      = goDeflate deflate k' (Chunks xs)
-                           deflateOne   = withDeflateInput deflate x (return . callback k)
-                       in checkDone cont $$ joinIO deflateOne
+    let done k    = return $$ joinIO $ finishDeflate deflate (return . callback k)
+        more k x  = joinIO $ withDeflateInput deflate x (return . callback k)
+    enumLoop done more step0
 
 -- A callback function for withInflateInput / withDeflateInput
 callback :: MonadIO m =>
@@ -81,20 +65,16 @@ callback k pop = maybe done more =<< liftIO pop
                      Continue k'    -> callback k' pop
                      other          -> return other
 
--- Conversion utility
-joinIO :: MonadIO m => IO (m (Step a m b)) -> Iteratee a m b
-joinIO = Iteratee . join . liftIO
-
 -- testInflate = do
 --     h <- openBinaryFile "test-out" WriteMode
 --     run $ enumFile "test.z"
---            $$ enumInflate defaultWindowBits
+--            $$ decompress defaultWindowBits
 --            $$ iterHandle h
 --     hClose h
 -- 
 -- testDeflate = do
 --     h <- openBinaryFile "test.z" WriteMode
 --     run $ enumFile "test"
---            $$ enumDeflate 7 defaultWindowBits
+--            $$ compress 7 defaultWindowBits
 --            $$ iterHandle h
 --     hClose h
