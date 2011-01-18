@@ -31,7 +31,7 @@ enumLoop done more = checkDone loop where
 
 decompress :: MonadIO m
     => WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
-    -> Enumeratee ByteString ByteString m ()
+    -> Enumeratee ByteString ByteString m a
 decompress config step0 = do
     inflate <- liftIO $ initInflate config
     let done k      = do lastChunk <- liftIO $ finishInflate inflate
@@ -46,7 +46,7 @@ decompress config step0 = do
 compress :: MonadIO m
     => Int        -- ^ Compression level
     -> WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
-    -> Enumeratee ByteString ByteString m ()
+    -> Enumeratee ByteString ByteString m a
 compress level config step0 = do
     deflate <- liftIO $ initDeflate level config
     let done k    = joinIO $ finishDeflate deflate (return . callback k)
