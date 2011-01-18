@@ -7,14 +7,14 @@ maintainer:     Malte Sommerkorn <malte.sommerkorn@googlemail.com>
 synopsis:       Enumerator interface for zlib compression
 description:    zlib-enum is a stop-gap package to provide enumeratees for
                 zlib compression/decompression.
-category:       Codec, Enumerator
+category:       Codec, Compression, Enumerator
 stability:      Experimental
 cabal-version:  >= 1.6
 build-type:     Simple
 homepage:       http://github.com/maltem/zlib-enum
 
 library
-    build-depends: base                  >= 4
+    build-depends: base                  >= 4 && < 5
                  , bytestring
                  , mtl                   >= 2
                  , enumerator            >= 0.4
