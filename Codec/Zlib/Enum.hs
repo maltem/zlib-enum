@@ -57,13 +57,13 @@ compress level config step0 = do
 callback :: MonadIO m =>
     (Stream a -> Iteratee a m b) -> IO (Maybe a) -> m (Step a m b)
 
-callback k pop = maybe done more =<< liftIO pop
+callback k pop = runIteratee . k . Chunks =<< liftIO (go id)
   where
-    done   = return (Continue k)
-    more y = do step <- runIteratee (k (Chunks [y]))
-                case step of
-                     Continue k'    -> callback k' pop
-                     other          -> return other
+  go front = do
+    x <- pop
+    case x of
+      Nothing -> return $ front []
+      Just y  -> go (front . (:) y)
 
 -- testInflate = do
 --     h <- openBinaryFile "test-out" WriteMode
