@@ -7,7 +7,7 @@ module Codec.Zlib.Enum (
 
 import Codec.Zlib
 import Data.Enumerator as E
-import Control.Monad.Trans (MonadIO, liftIO)
+import Control.Monad.Trans (MonadIO, liftIO, lift)
 import Data.ByteString (ByteString)
 import Control.Monad (join)
 
@@ -32,12 +32,28 @@ enumLoop done more = checkDone loop where
 decompress :: MonadIO m
     => WindowBits -- ^ Zlib parameter (see the zlib-bindings package as well as the zlib C library)
     -> Enumeratee ByteString ByteString m a
-decompress config step0 = do
-    inflate <- liftIO $ initInflate config
-    let done k      = do lastChunk <- liftIO $ finishInflate inflate
-                         k (Chunks [lastChunk])
-        more x k    = joinIO $ withInflateInput inflate x (return . callback k)
-    enumLoop done more step0
+decompress config inner = do
+    fzstr <- liftIO $ initInflate config
+    decompress' fzstr inner
+
+decompress' :: MonadIO m => Inflate -> Enumeratee ByteString ByteString m b
+decompress' fzstr (Continue k) = do
+    x <- E.head
+    case x of
+        Nothing -> do
+            chunk <- liftIO $ finishInflate fzstr
+            lift $ runIteratee $ k $ Chunks [chunk]
+        Just bs -> do
+            chunks <- liftIO $ withInflateInput fzstr bs $ go id
+            step <- lift $ runIteratee $ k $ Chunks chunks
+            decompress' fzstr step
+  where
+    go front pop = do
+        x <- pop
+        case x of
+            Nothing -> return $ front []
+            Just y -> go (front . (:) y) pop
+decompress' _ step = return step
 
 -- |
 -- Compress (deflate) a stream of 'ByteString's. The 'WindowBits' also control
