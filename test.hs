@@ -20,8 +20,8 @@ module Main where
 
 import Prelude
 
-import Data.Word (Word8)
-import Data.List (unfoldr)
+-- import Data.Word (Word8)
+import Data.String (fromString)
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -46,9 +46,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import qualified Test.QuickCheck.Monadic as Q
 
--- import System.IO.Unsafe (unsafePerformIO)
-import System.Process (system)
-import System.Environment (getArgs)
+-- import System.Environment (getArgs)
 import System.IO (IOMode (..), openFile, hClose)
 
 -------------------------------------------------------------------------------
@@ -75,6 +73,12 @@ instance Arbitrary L.ByteString where
 -- Utility Functions
 -------------------------------------------------------------------------------
 
+-- | Concatenate an Iteratee and a list of Enumeratees into an Iteratee.
+concatE :: Monad m => Iteratee a m b -> [Enumeratee a a m b] -> Iteratee a m b
+concatE = foldr f
+  where
+  f iter enums = joinI $ iter $$ enums
+
 -- | Iteratee that consumes the entire Stream as a strict ByteString.
 consume :: Monad m => Iteratee ByteString m ByteString
 consume = do
@@ -87,31 +91,58 @@ unconsumed = E.sequence $ do
   xs <- EB.take 100
   return $ B.concat $ L.toChunks xs
 
+-- | Compress and decompress without doing anything else.
+compressDecompress
+  :: MonadIO m
+  => WindowBits
+  -> [ByteString]
+  -> m ByteString
+compressDecompress win xs =
+  E.run_ $  E.enumList 1 xs
+         $$ joinI $ Z.compress 7 win
+         $$ joinI $ Z.decompress win
+         $$ consume
+
 -- | Compress and decompress a ByteString with given WindowBits,
 -- piping the stream with an Enumeratee.
-compressDecompress
+compressDecompressWith
   :: MonadIO m
   => Enumeratee ByteString ByteString m ByteString
   -> WindowBits
   -> [ByteString]
   -> m ByteString
-compressDecompress enum win xs = do
+compressDecompressWith enum win xs =
   E.run_ $  E.enumList 1 xs
          $$ joinI $ Z.compress 7 win
          $$ joinI $ enum
          $$ joinI $ Z.decompress win
          $$ consume
 
+-- | Compress a ByteString 'n' times and then decompress it 'n' times
+compressDecompressMany
+  :: MonadIO m
+  => WindowBits
+  -> Int
+  -> [ByteString]
+  -> m ByteString
+compressDecompressMany win n xs =
+  E.run_ $  E.enumList 1 xs
+         $$ concatE consume es
+  where
+  es = replicate m (Z.compress 7 win) ++ replicate m (Z.decompress win)
+  m = 1 + (abs n `rem` 20) -- restrict n to [1, 20]
+
+-- | Decompress a file with 'unconsumed'
 decompressUnconsumed :: FilePath -> IO ByteString
-decompressUnconsumed file = do
+decompressUnconsumed file =
   E.run_ $  EB.enumFile file
          $$ joinI $ Z.decompress (WindowBits 31)
          $$ joinI $ unconsumed
          $$ consume
 
 -- | Create uncompressed and compressed files for testing.
-setupFiles :: FilePath -> IO ()
-setupFiles file = bracket
+createFiles :: FilePath -> IO ()
+createFiles file = bracket
   (do hDeco <- openFile file WriteMode
       hComp <- openFile (file ++ ".gz") WriteMode
       return (hDeco, hComp)
@@ -136,14 +167,19 @@ setupFiles file = bracket
 -- Properties
 -------------------------------------------------------------------------------
 
-prop_identity :: [ByteString] -> WindowBits -> Property
-prop_identity xs win = monadicIO $ do
-  ys <- Q.run $ compressDecompress (E.map id) win xs
+prop_compress_decompress :: WindowBits -> [ByteString] -> Property
+prop_compress_decompress win xs = monadicIO $ do
+  ys <- Q.run $ compressDecompress win xs
   assert (B.concat xs == ys)
 
-prop_unconsumed :: [ByteString] -> WindowBits -> Property
-prop_unconsumed xs win = monadicIO $ do
-  ys <- Q.run $ compressDecompress unconsumed win xs
+prop_unconsumed :: WindowBits -> [ByteString] -> Property
+prop_unconsumed win xs = monadicIO $ do
+  ys <- Q.run $ compressDecompressWith unconsumed win xs
+  assert (B.concat xs == ys)
+
+prop_many :: WindowBits -> Int -> [ByteString] -> Property
+prop_many win n xs = monadicIO $ do
+  ys <- Q.run $ compressDecompressMany win n xs
   assert (B.concat xs == ys)
 
 prop_files :: FilePath -> Property
@@ -159,10 +195,12 @@ prop_files file = monadicIO $ do
 
 main :: IO ()
 main = do
-  -- quickCheck prop_identity
+  quickCheck prop_compress_decompress
 
   quickCheck prop_unconsumed
 
+  quickCheck prop_many
+
   let testFile = "zlib-enum-test-file"
-  setupFiles testFile
+  createFiles testFile
   quickCheck (prop_files testFile)
