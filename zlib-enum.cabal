@@ -35,15 +35,16 @@ executable zlib-enum-test
     main-is: test.hs
     if flag(test)
         Buildable: True
-        build-depends: base                  >= 4.0   &&   < 5.0
-                     , bytestring            >= 0.9   &&   < 0.10
-                     , mtl                   >= 2.0   &&   < 2.1
-                     , enumerator            >= 0.4   &&   < 0.5
-                     , zlib-bindings         >= 0.0   &&   < 0.1
-                     , process               >= 1.0   &&   < 1.1
-                     , test-framework        >= 0.3   &&   < 0.4
-                     , test-framework-quickcheck2 >= 0.2.9  &&   < 0.3.0
-                     , QuickCheck            >= 2.4   &&   < 2.5
+        build-depends:
+              base                       >= 4.0   &&   < 5.0
+            , bytestring                 >= 0.9   &&   < 0.10
+            , mtl                        >= 2.0   &&   < 2.1
+            , enumerator                 >= 0.4   &&   < 0.5
+            , zlib-bindings              >= 0.0   &&   < 0.1
+            , process                    >= 1.0   &&   < 1.1
+            , test-framework             >= 0.3   &&   < 0.4
+            , test-framework-quickcheck2 >= 0.2.9 &&   < 0.3.0
+            , QuickCheck                 >= 2.4   &&   < 2.5
     else
         Buildable: False
     ghc-options:     -Wall
