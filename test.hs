@@ -48,7 +48,6 @@ import Test.QuickCheck.Monadic
 import qualified Test.QuickCheck.Monadic as Q
 
 import System.IO (IOMode (..), openFile, hClose)
-import System.IO.Unsafe (unsafePerformIO)
 
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -231,7 +230,7 @@ prop_decompress_compare win xs = monadicIO $ do
   assert $ enum == chks
 
 -- | Check: bs == decompress (compress bs)
--- (That is, in separate Enumeratees)
+-- (That is, with separate Enumeratees)
 prop_compress_decompress :: WindowBits -> [ByteString] -> Property
 prop_compress_decompress win xs = monadicIO $ do
   cs <- Q.run $ compress win xs
@@ -239,7 +238,7 @@ prop_compress_decompress win xs = monadicIO $ do
   assert (B.concat xs == ys)
 
 -- | Check: bs == compressDecompress bs
--- (That is, in a single Enumeratee)
+-- (That is, with a single Enumeratee)
 prop_compress_decompress' :: WindowBits -> [ByteString] -> Property
 prop_compress_decompress' win xs = monadicIO $ do
   ys <- Q.run $ compressDecompress win xs
@@ -269,7 +268,7 @@ prop_many win n xs = monadicIO $ do
   ys <- Q.run $ compressDecompressMany win n xs
   assert (B.concat xs == ys)
 
--- | Check compressing and decompresssing a file
+-- | Check compressing and decompressing a file
 prop_files_map_id :: FilePath -> WindowBits -> [ByteString] -> Property
 prop_files_map_id file win xs = monadicIO $ do
   Q.run $ compressFileWith enum win file xs
