@@ -37,7 +37,7 @@ import qualified Data.Enumerator.Text as ET
 import qualified Data.Enumerator.Binary as EB
 
 import Control.Monad (foldM)
-import Control.Monad.Trans (MonadIO (..), liftIO, lift)
+import Control.Monad.Trans (MonadIO (..))
 import Control.Exception (bracket)
 
 import Codec.Zlib
@@ -47,7 +47,7 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 import qualified Test.QuickCheck.Monadic as Q
 
-import System.IO (IOMode (..), openFile, hClose)
+import System.IO (IOMode (..), openBinaryFile, hClose)
 
 import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
@@ -102,7 +102,7 @@ compress
   -> m ByteString
 compress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compress 7 win
+         $$ joinI $ Z.compressWith 7 win
          $$ consume
 
 -- | Decompress a list of ByteStrings
@@ -113,7 +113,7 @@ decompress
   -> m ByteString
 decompress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.decompress win
+         $$ joinI $ Z.decompressWith win
          $$ consume
 
 -- | Compress and decompress without doing anything else.
@@ -124,8 +124,8 @@ compressDecompress
   -> m ByteString
 compressDecompress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compress 7 win
-         $$ joinI $ Z.decompress win
+         $$ joinI $ Z.compressWith 7 win
+         $$ joinI $ Z.decompressWith win
          $$ consume
 
 -- | Compress and decompress a ByteString with given WindowBits,
@@ -138,9 +138,9 @@ compressDecompressWith
   -> m ByteString
 compressDecompressWith enum win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compress 7 win
+         $$ joinI $ Z.compressWith 7 win
          $$ joinI $ enum
-         $$ joinI $ Z.decompress win
+         $$ joinI $ Z.decompressWith win
          $$ consume
 
 -- | Compress a ByteString 'n' times and then decompress it 'n' times
@@ -154,7 +154,7 @@ compressDecompressMany win n xs =
   E.run_ $  E.enumList 1 xs
          $$ concatWith consume es
   where
-  es = replicate m (Z.compress 7 win) ++ replicate m (Z.decompress win)
+  es = replicate m (Z.compressWith 7 win) ++ replicate m (Z.decompressWith win)
   m = 1 + (abs n `rem` 10) -- restrict n to [1, 10]
 
 -- | Compress a [ByteString] to a file with an Enumeratee
@@ -162,11 +162,11 @@ compressFileWith
   :: Enumeratee ByteString ByteString IO ()
   -> WindowBits -> FilePath -> [ByteString] -> IO ()
 compressFileWith enum win file xs = bracket
-  (openFile file WriteMode)
+  (openBinaryFile file WriteMode)
   (hClose)
   $ \ h -> do
     run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compress 7 win
+         $$ joinI $ Z.compressWith 7 win
          $$ joinI $ enum
          $$ EB.iterHandle h
 
@@ -176,7 +176,7 @@ decompressFileWith
   -> WindowBits -> FilePath -> IO ByteString
 decompressFileWith enum win file =
   run_ $  EB.enumFile file
-       $$ joinI $ Z.decompress win
+       $$ joinI $ Z.decompressWith win
        $$ joinI $ enum
        $$ consume
 
@@ -187,7 +187,7 @@ compressChunks win xs = do
     gziped <- foldM (go' def) id xs
     gziped' <- finishDeflate def $ go gziped
     return $ gziped' []
-  where
+    where
     go' def front bs = withDeflateInput def bs $ go front
     go front x = do
         y <- x
@@ -202,7 +202,7 @@ decompressChunks win xs = do
     ungziped <- foldM (go' inf) id xs
     final <- finishInflate inf
     return $ ungziped [final]
-  where
+    where
     go' inf front bs = withInflateInput inf bs $ go front
     go front x = do
         y <- x
