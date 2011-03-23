@@ -102,7 +102,7 @@ compress
   -> m ByteString
 compress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compressWith 7 win
+         $$ joinI $ Z.compress 7 win
          $$ consume
 
 -- | Decompress a list of ByteStrings
@@ -113,7 +113,7 @@ decompress
   -> m ByteString
 decompress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.decompressWith win
+         $$ joinI $ Z.decompress win
          $$ consume
 
 -- | Compress and decompress without doing anything else.
@@ -124,8 +124,8 @@ compressDecompress
   -> m ByteString
 compressDecompress win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compressWith 7 win
-         $$ joinI $ Z.decompressWith win
+         $$ joinI $ Z.compress 7 win
+         $$ joinI $ Z.decompress win
          $$ consume
 
 -- | Compress and decompress a ByteString with given WindowBits,
@@ -138,9 +138,9 @@ compressDecompressWith
   -> m ByteString
 compressDecompressWith enum win xs =
   E.run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compressWith 7 win
+         $$ joinI $ Z.compress 7 win
          $$ joinI $ enum
-         $$ joinI $ Z.decompressWith win
+         $$ joinI $ Z.decompress win
          $$ consume
 
 -- | Compress a ByteString 'n' times and then decompress it 'n' times
@@ -154,7 +154,7 @@ compressDecompressMany win n xs =
   E.run_ $  E.enumList 1 xs
          $$ concatWith consume es
   where
-  es = replicate m (Z.compressWith 7 win) ++ replicate m (Z.decompressWith win)
+  es = replicate m (Z.compress 7 win) ++ replicate m (Z.decompress win)
   m = 1 + (abs n `rem` 10) -- restrict n to [1, 10]
 
 -- | Compress a [ByteString] to a file with an Enumeratee
@@ -166,7 +166,7 @@ compressFileWith enum win file xs = bracket
   (hClose)
   $ \ h -> do
     run_ $  E.enumList 1 xs
-         $$ joinI $ Z.compressWith 7 win
+         $$ joinI $ Z.compress 7 win
          $$ joinI $ enum
          $$ EB.iterHandle h
 
@@ -176,7 +176,7 @@ decompressFileWith
   -> WindowBits -> FilePath -> IO ByteString
 decompressFileWith enum win file =
   run_ $  EB.enumFile file
-       $$ joinI $ Z.decompressWith win
+       $$ joinI $ Z.decompress win
        $$ joinI $ enum
        $$ consume
 
