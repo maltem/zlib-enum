@@ -20,20 +20,17 @@ module Main where
 
 import Prelude
 
--- import Data.Word (Word8)
-import Data.String (fromString)
+import Data.String ()
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as L
 
 import Data.Enumerator
-  ( Stream (..), Step (..), Iteratee (..), Enumerator, Enumeratee
-  , ($$), returnI, yield, continue, joinI, run, run_ )
+  ( Iteratee (..), Enumeratee
+  , ($$), joinI, run_ )
 import qualified Data.Enumerator as E
 import qualified Data.Enumerator.List as EL
-import qualified Data.Enumerator.Text as ET
 import qualified Data.Enumerator.Binary as EB
 
 import Control.Monad (foldM)
@@ -59,6 +56,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 -- | QuickCheck wants a Show instance for WindowBits
 instance Show WindowBits where
   show (WindowBits n) = "WindowBits " ++ show n
+  show _              = "DefaultWindowBits" -- not exported from zlib
 
 -- | Random values for WindowBits: 15 or 31
 instance Arbitrary WindowBits where

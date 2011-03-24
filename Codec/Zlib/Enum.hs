@@ -2,7 +2,7 @@ module Codec.Zlib.Enum (
     -- * Enumeratees
     compress, decompress,
     -- * Re-exported from zlib-bindings
-    WindowBits, defaultWindowBits
+    WindowBits (..), defaultWindowBits
 ) where
 
 import Codec.Zlib
