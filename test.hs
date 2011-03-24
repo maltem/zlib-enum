@@ -34,7 +34,7 @@ import qualified Data.Enumerator.List as EL
 import qualified Data.Enumerator.Binary as EB
 
 import Control.Monad (foldM)
-import Control.Monad.Trans (MonadIO (..))
+import Control.Monad.IO.Class (MonadIO (..))
 import Control.Exception (bracket)
 
 import Codec.Zlib

@@ -8,7 +8,8 @@ module Codec.Zlib.Enum (
 import Codec.Zlib
 import Data.Enumerator as E
 import qualified Data.Enumerator.List as EL
-import Control.Monad.Trans (MonadIO, liftIO, lift)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString (ByteString)
 
 -- | Gzip compression with default parameters.
