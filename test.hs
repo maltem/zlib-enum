@@ -126,6 +126,14 @@ compressDecompress win xs =
          $$ joinI $ Z.decompress win
          $$ consume
 
+-- | The same, but for 'gzip', 'ungzip'
+gzipUngzip :: MonadIO m => [ByteString] -> m ByteString
+gzipUngzip xs =
+  E.run_ $  E.enumList 1 xs
+         $$ joinI $ Z.gzip
+         $$ joinI $ Z.ungzip
+         $$ consume
+
 -- | Compress and decompress a ByteString with given WindowBits,
 -- piping the stream with an Enumeratee.
 compressDecompressWith
@@ -242,6 +250,13 @@ prop_compress_decompress' win xs = monadicIO $ do
   ys <- Q.run $ compressDecompress win xs
   assert (B.concat xs == ys)
 
+-- | Check: bs == gzipUngzip bs
+-- (just to see if the default parameters aren't broken)
+prop_gzip_ungzip :: [ByteString] -> Property
+prop_gzip_ungzip xs = monadicIO $ do
+  ys <- Q.run $ gzipUngzip xs
+  assert (B.concat xs == ys)
+
 -- | Check if using an Iteratee that consumes only a few bytes works
 prop_unconsumed :: WindowBits -> [ByteString] -> Property
 prop_unconsumed win xs = monadicIO $ do
@@ -296,6 +311,7 @@ tests = let testFile = "zlib-enum-test-file" in
   , testGroup "enumList"
     [ testProperty "compress_decompress" prop_compress_decompress
     , testProperty "compress_decompress'" prop_compress_decompress'
+    , testProperty "gzip_ungzip" prop_gzip_ungzip
     , testProperty "unconsumed" prop_unconsumed
     , testProperty "map_id" prop_map_id
     , testProperty "map_revrev" prop_map_revrev
