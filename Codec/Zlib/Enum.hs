@@ -14,11 +14,11 @@ import Data.ByteString (ByteString)
 
 -- | Gzip compression with default parameters.
 gzip :: MonadIO m => Enumeratee ByteString ByteString m a
-gzip = compress 1 defaultWindowBits
+gzip = compress 1 (WindowBits 31)
 
 -- | Gzip decompression with default parameters.
 ungzip :: MonadIO m => Enumeratee ByteString ByteString m a
-ungzip = decompress defaultWindowBits
+ungzip = decompress (WindowBits 31)
 
 -- |
 -- Decompress (inflate) a stream of 'ByteString's. For example:

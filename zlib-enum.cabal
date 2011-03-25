@@ -1,5 +1,5 @@
 name:           zlib-enum
-version:        0.2
+version:        0.2.1
 license:        MIT
 license-file:   LICENSE
 author:         Paulo Tanimoto <ptanimoto@gmail.com>
