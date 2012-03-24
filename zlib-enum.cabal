@@ -25,8 +25,8 @@ library
     build-depends: base                  >= 4 && < 5
                  , bytestring
                  , transformers          == 0.2.*
-                 , enumerator            >= 0.4
-                 , zlib-bindings         >= 0.1
+                 , enumerator            == 0.4.*
+                 , zlib-bindings         == 0.1.*
     exposed-modules: Codec.Zlib.Enum
     ghc-options:     -Wall
 
