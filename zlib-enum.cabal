@@ -41,7 +41,6 @@ executable zlib-enum-test
             , transformers               == 0.2.*
             , enumerator                 >= 0.4   &&   < 0.5
             , zlib-bindings              >= 0.1
-            , process                    >= 1.0   &&   < 1.1
             , test-framework             >= 0.6   &&   < 0.7
             , test-framework-quickcheck2 >= 0.2.12.1 &&   < 0.3.0
             , QuickCheck                 >= 2.4   &&   < 2.5
