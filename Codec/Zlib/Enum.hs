@@ -41,7 +41,7 @@ decompress' inf (Continue k) = do
             chunk <- liftIO $ finishInflate inf
             lift $ runIteratee $ k $ Chunks [chunk]
         Just bs -> do
-            chunks <- liftIO $ withInflateInput inf bs $ callback
+            chunks <- liftIO $ (feedInflate inf bs >>= callback)
             step <- lift $ runIteratee $ k $ Chunks chunks
             decompress' inf step
 decompress' _ step = return step
@@ -64,10 +64,10 @@ compress' def (Continue k) = do
     x <- EL.head
     case x of
         Nothing -> do
-            chunks <- liftIO $ finishDeflate def $ callback
+            chunks <- liftIO $ callback (finishDeflate def)
             lift $ runIteratee $ k $ Chunks chunks
         Just bs -> do
-            chunks <- liftIO $ withDeflateInput def bs $ callback
+            chunks <- liftIO $ (feedDeflate def bs >>= callback)
             step <- lift $ runIteratee $ k $ Chunks chunks
             compress' def step
 compress' _ step = return step

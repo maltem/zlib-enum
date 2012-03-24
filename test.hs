@@ -191,10 +191,10 @@ compressChunks :: WindowBits -> [ByteString] -> IO [ByteString]
 compressChunks win xs = do
     def <- initDeflate 7 win
     gziped <- foldM (go' def) id xs
-    gziped' <- finishDeflate def $ go gziped
+    gziped' <- go gziped (finishDeflate def)
     return $ gziped' []
     where
-    go' def front bs = withDeflateInput def bs $ go front
+    go' def front bs = feedDeflate def bs >>= go front
     go front x = do
         y <- x
         case y of
@@ -209,7 +209,7 @@ decompressChunks win xs = do
     final <- finishInflate inf
     return $ ungziped [final]
     where
-    go' inf front bs = withInflateInput inf bs $ go front
+    go' inf front bs = feedInflate inf bs >>= go front
     go front x = do
         y <- x
         case y of
